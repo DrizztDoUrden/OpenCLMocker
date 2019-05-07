@@ -33,7 +33,7 @@ namespace
 		}
 
 		if (param_value_size_ret != nullptr)
-			* param_value_size_ret = memory;
+			*param_value_size_ret = memory;
 
 		return true;
 	}
@@ -49,7 +49,7 @@ namespace
 		}
 
 		if (param_value_size_ret != nullptr)
-			* param_value_size_ret = sizeof(TValue);
+			*param_value_size_ret = sizeof(TValue);
 
 		return true;
 	}
@@ -66,7 +66,7 @@ namespace
 		}
 
 		if (param_value_size_ret != nullptr)
-			* param_value_size_ret = memory;
+			*param_value_size_ret = memory;
 
 		return true;
 	}
@@ -553,6 +553,20 @@ cl_int CL_API_CALL clEnqueueCopyBuffer(cl_command_queue command_queue, cl_mem /*
 	if (ev != nullptr)
 		MapType(ev) = mockEvent;
 
+	return CL_SUCCESS;
+}
+
+cl_int CL_API_CALL clEnqueueReadBuffer(cl_command_queue command_queue, cl_mem /* buffer */, cl_bool blocking_read, size_t /* offset */, size_t  /* size */, void* /* ptr */, cl_uint  num_events_in_wait_list, const cl_event* event_wait_list, cl_event* ev) CL_API_SUFFIX__VERSION_1_0
+{
+	auto mockEvent = OpenCL::Event{ { event_wait_list, event_wait_list + num_events_in_wait_list }, std::chrono::nanoseconds(1000 + rand() % 1000) };
+
+	if (blocking_read)
+	{
+		mockEvent.Wait();
+		return CL_SUCCESS;
+	}
+
+	MapType(command_queue).RegisterEvent(new OpenCL::Event{std::move(mockEvent)});
 	return CL_SUCCESS;
 }
 
