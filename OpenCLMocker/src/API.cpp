@@ -364,7 +364,15 @@ cl_int CL_API_CALL clFinish(cl_command_queue command_queue) CL_API_SUFFIX__VERSI
 cl_mem CL_API_CALL clCreateBuffer(cl_context /* context */, cl_mem_flags /* flags */, size_t /* size */, void* /* host_ptr */, cl_int* errcode_ret) CL_API_SUFFIX__VERSION_1_0
 {
 	if (errcode_ret != nullptr)
-		* errcode_ret = CL_SUCCESS;
+		*errcode_ret = CL_SUCCESS;
+
+	return MapType(new OpenCL::Buffer{});
+}
+
+cl_mem CL_API_CALL clCreateSubBuffer(cl_mem /* buffer */, cl_mem_flags /* flags */, cl_buffer_create_type /* buffer_create_type */, const void* /* buffer_create_info */, cl_int* errcode_ret) CL_API_SUFFIX__VERSION_1_1
+{
+	if (errcode_ret != nullptr)
+		*errcode_ret = CL_SUCCESS;
 
 	return MapType(new OpenCL::Buffer{});
 }
@@ -413,6 +421,14 @@ cl_program CL_API_CALL clCreateProgramWithSource(cl_context /* context */, cl_ui
 {
 	if (errcode_ret != nullptr)
 		*errcode_ret = CL_SUCCESS;
+
+	return MapType(new OpenCL::Program{});
+}
+
+cl_program CL_API_CALL clCreateProgramWithBinary(cl_context /* context */, cl_uint /* num_devices */, const cl_device_id* /* device_list */, const size_t* /* lengths */, const unsigned char** /* binaries */, cl_int* /* binary_status */, cl_int* errcode_ret) CL_API_SUFFIX__VERSION_1_0
+{
+	if (errcode_ret != nullptr)
+		* errcode_ret = CL_SUCCESS;
 
 	return MapType(new OpenCL::Program{});
 }
