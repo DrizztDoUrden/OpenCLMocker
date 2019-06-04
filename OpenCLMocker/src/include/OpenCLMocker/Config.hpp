@@ -27,7 +27,7 @@ namespace OpenCL
         std::vector<DeviceConfig> devices{ 1 };
 
         std::string name = "Fake Platform";
-        std::string vendor = "0.0.1";
+        std::string vendor = "GPSProlapse";
         std::string profile = "No profile";
         std::string version = "0.0.1";
 
