@@ -2,6 +2,7 @@
 
 #include <OpenCLMocker/ForbidCopy.hpp>
 #include <OpenCLMocker/MapToCl.hpp>
+#include <OpenCLMocker/Retainable.hpp>
 
 #include <CL/cl.h>
 
@@ -11,7 +12,7 @@
 
 namespace OpenCL
 {
-    class Event
+    class Event : public Retainable
     {
         ForbidCopy(Event);
 

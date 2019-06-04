@@ -347,6 +347,19 @@ cl_command_queue CL_API_CALL clCreateCommandQueue(cl_context context, cl_device_
 	return MapType(new OpenCL::Queue{ std::move(queue) });
 }
 
+cl_command_queue CL_API_CALL clCreateCommandQueueWithProperties(cl_context context, cl_device_id device, const cl_queue_properties* /* properties */, cl_int* errcode_ret) CL_API_SUFFIX__VERSION_2_0
+{
+	auto queue = OpenCL::Queue{};
+
+	queue.ctx = &MapType(context);
+	queue.device = &MapType(device);
+
+	if (errcode_ret != nullptr)
+		* errcode_ret = CL_SUCCESS;
+
+	return MapType(new OpenCL::Queue{ std::move(queue) });
+}
+
 cl_int CL_API_CALL clRetainCommandQueue(cl_command_queue command_queue) CL_API_SUFFIX__VERSION_1_0
 {
 	MapType(command_queue).Retain();
@@ -623,5 +636,13 @@ cl_int CL_API_CALL clReleaseContext(cl_context context) CL_API_SUFFIX__VERSION_1
 	auto& ctx = MapType(context);
 	if (ctx.Release())
 		delete& ctx;
+	return CL_SUCCESS;
+}
+
+cl_int CL_API_CALL clReleaseEvent(cl_event ev) CL_API_SUFFIX__VERSION_1_0
+{
+	auto& event = MapType(ev);
+	if (event.Release())
+		delete& event;
 	return CL_SUCCESS;
 }
