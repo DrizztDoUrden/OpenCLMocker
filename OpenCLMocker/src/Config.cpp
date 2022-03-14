@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <iostream>
 #include <fstream>
 
 using nlohmann::json;
@@ -71,7 +72,6 @@ namespace OpenCL
 
     Config::Config(const std::string& path)
     {
-        json j;
         auto file = std::ifstream{ path };
 
         if (file.bad())
@@ -80,7 +80,15 @@ namespace OpenCL
             return;
         }
 
-        file >> j;
-        *this = j.get<Config>();
+        try
+        {
+            json j;
+            file >> j;
+            *this = j.get<Config>();
+        }
+        catch (const std::exception& ex)
+        {
+            std::cerr << ex.what() << std::endl;
+        }
     }
 }
