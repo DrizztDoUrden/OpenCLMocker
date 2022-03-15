@@ -18,17 +18,31 @@
 #include <string>
 #include <thread>
 
+namespace OpenCL
+{
+	constexpr bool ExtensiveLogging = false;
+}
+
 namespace
 {
 	template <class TElement>
-	bool FillArrayProperty(const TElement* arr, std::size_t size, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+	bool FillArrayProperty(const TElement* arr, std::size_t size, size_t param_value_size, void* param_value, size_t* param_value_size_ret, const char* description = "")
 	{
 		const auto memory = size * sizeof(TElement);
+		const auto fullDescription = strlen(description) > 0
+			? std::string{" ("} + description + ")"
+			: description;
 
 		if (param_value != nullptr && param_value_size != 0)
 		{
+			if (OpenCL::ExtensiveLogging)
+				std::cerr << "CL Mocker" << fullDescription << ": Writing " << memory << " bytes to 0x" << std::ios::hex << reinterpret_cast<std::ptrdiff_t>(param_value) << std::ios::dec << "." << std::endl;
+
 			if (param_value_size < memory)
+			{
+				std::cerr << "CL Mocker" << fullDescription << ": Not enough memory to store value: " << param_value_size << " < " << memory << "." << std::endl;
 				return false;
+			}
 			std::memcpy(param_value, arr, memory);
 		}
 
@@ -39,12 +53,22 @@ namespace
 	}
 
 	template <class TValue>
-	bool FillProperty(TValue value, size_t param_value_size, void* param_value, size_t* param_value_size_ret)
+	bool FillProperty(TValue value, size_t param_value_size, void* param_value, size_t* param_value_size_ret, const char* description = "")
 	{
+		const auto fullDescription = strlen(description) > 0
+			? std::string{ " (" } + description + ")"
+			: description;
+
 		if (param_value != nullptr && param_value_size != 0)
 		{
+			if (OpenCL::ExtensiveLogging)
+				std::cerr << "CL Mocker" << fullDescription << ": Writing " << sizeof(TValue) << " bytes to 0x" << std::ios::hex << reinterpret_cast<std::ptrdiff_t>(param_value) << std::ios::dec << ": " << value << std::endl;
+
 			if (param_value_size < sizeof(TValue))
+			{
+				std::cerr << "CL Mocker" << fullDescription << ": Not enough memory to store value: " << param_value_size << " < " << sizeof(TValue) << "." << std::endl;
 				return false;
+			}
 			*reinterpret_cast<TValue*>(param_value) = value;
 		}
 
@@ -257,15 +281,15 @@ cl_int CL_API_CALL clGetContextInfo(cl_context context, cl_context_info param_na
 	switch (param_name)
 	{
 	case CL_CONTEXT_PLATFORM:
-		if (!FillProperty(MapType(ctx.platform), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(MapType(ctx.platform), param_value_size, param_value, param_value_size_ret, "clGetContextInfo(CL_CONTEXT_PLATFORM)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_CONTEXT_NUM_DEVICES:
-		if (!FillProperty(static_cast<cl_uint>(ctx.devices.size()), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(static_cast<cl_uint>(ctx.devices.size()), param_value_size, param_value, param_value_size_ret, "clGetContextInfo(CL_CONTEXT_PLATFORM)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_CONTEXT_DEVICES:
-		if (!FillArrayProperty(ctx.devices.data(), ctx.devices.size(), param_value_size, param_value, param_value_size_ret))
+		if (!FillArrayProperty(ctx.devices.data(), ctx.devices.size(), param_value_size, param_value, param_value_size_ret, "clGetContextInfo(CL_CONTEXT_DEVICES)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	default:
@@ -293,39 +317,39 @@ cl_int CL_API_CALL clGetDeviceInfo(cl_device_id device, cl_device_info param_nam
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_MAX_MEM_ALLOC_SIZE:
-		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_GLOBAL_MEM_SIZE:
-		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_GLOBAL_MEM_SIZE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_LOCAL_MEM_SIZE:
-		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(std::numeric_limits<cl_ulong>::max(), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_LOCAL_MEM_SIZE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_MAX_WORK_GROUP_SIZE:
-		if (!FillProperty(std::numeric_limits<size_t>::max(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(std::numeric_limits<size_t>::max(), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_MAX_CLOCK_FREQUENCY:
-		if (!FillProperty(std::numeric_limits<cl_uint>::max(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(std::numeric_limits<cl_uint>::max(), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_MAX_CLOCK_FREQUENCY)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_MAX_COMPUTE_UNITS:
-		if (!FillProperty(static_cast<cl_uint>(64), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(static_cast<cl_uint>(64), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_MAX_COMPUTE_UNITS)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_VENDOR_ID:
-		if (!FillProperty(static_cast<cl_uint>(0x1002), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(static_cast<cl_uint>(0x1002), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_VENDOR_ID)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_AVAILABLE:
-		if (!FillProperty(static_cast<cl_bool>(true), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(static_cast<cl_bool>(true), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_AVAILABLE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_DEVICE_PLATFORM:
-		if (!FillProperty(MapType(dev.GetPlatform()), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(MapType(dev.GetPlatform()), param_value_size, param_value, param_value_size_ret, "clGetDeviceInfo(CL_DEVICE_PLATFORM)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	default:
@@ -417,11 +441,11 @@ cl_int CL_API_CALL clGetCommandQueueInfo(cl_command_queue command_queue, cl_comm
 	switch (param_name)
 	{
 	case CL_QUEUE_CONTEXT:
-		if (!FillProperty(MapType(queue.ctx), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(MapType(queue.ctx), param_value_size, param_value, param_value_size_ret, "clGetCommandQueueInfo(CL_QUEUE_CONTEXT)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_QUEUE_DEVICE:
-		if (!FillProperty(MapType(queue.device), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty(MapType(queue.device), param_value_size, param_value, param_value_size_ret, "clGetCommandQueueInfo(CL_QUEUE_DEVICE)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	default:
@@ -473,21 +497,38 @@ cl_int CL_API_CALL clGetProgramBuildInfo(cl_program /* program */, cl_device_id 
 
 cl_int CL_API_CALL clGetProgramInfo(cl_program /* program */, cl_program_info param_name, size_t param_value_size, void* param_value, size_t* param_value_size_ret) CL_API_SUFFIX__VERSION_1_0
 {
-	std::array<char, 1024> binary;
+	auto binaries = std::array<std::array<char, 1024>, 1>{};
 
 	switch (param_name)
 	{
 	case CL_PROGRAM_BINARY_SIZES:
-		if (!FillProperty(static_cast<size_t>(binary.size()), param_value_size, param_value, param_value_size_ret))
+	{
+		auto sizes = std::array<std::size_t, std::tuple_size<decltype(binaries)>::value>{};
+		std::transform(binaries.begin(), binaries.end(), sizes.begin(), [](auto&& arr) { return arr.size(); });
+
+		if (!FillArrayProperty(sizes.data(), sizes.size(), param_value_size, param_value, param_value_size_ret, "clGetProgramInfo(CL_PROGRAM_BINARY_SIZES)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
+	}
 	case CL_PROGRAM_BINARIES:
-		if (!FillArrayProperty(binary.data(), binary.size(), param_value_size, param_value, param_value_size_ret))
+	{
+		if (OpenCL::ExtensiveLogging)
+			std::cerr << "CL Mocker(clGetProgramInfo(CL_PROGRAM_BINARIES)): Writing " << binaries.size() << " binaries to 0x" << std::ios::hex << reinterpret_cast<std::ptrdiff_t>(param_value) << std::ios::dec << "." << std::endl;
+
+		if (param_value_size / sizeof(std::size_t) != binaries.size() ||
+			param_value_size % sizeof(std::size_t) != 0)
 			return CL_INVALID_ARG_SIZE;
+
+		const auto resultNum = param_value_size < sizeof(std::size_t);
+		char** results = reinterpret_cast<char**>(param_value);
+		for (auto i = 0; i < resultNum; ++i)
+			strncpy(results[i], binaries[i].data(), binaries[i].size());
+
 		return CL_SUCCESS;
+	}
 	default:
 		std::cerr << "Unknown device info: " << std::hex << param_name << std::endl;
-		return CL_INVALID_ARG_VALUE;
+		return CL_INVALID_VALUE;
 	}
 }
 
@@ -561,11 +602,11 @@ cl_int CL_API_CALL clGetEventProfilingInfo(cl_event ev, cl_profiling_info  param
 	switch (param_name)
 	{
 	case CL_PROFILING_COMMAND_START:
-		if (!FillProperty<cl_ulong>(mockEvent.GetStart().time_since_epoch().count(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty<cl_ulong>(mockEvent.GetStart().time_since_epoch().count(), param_value_size, param_value, param_value_size_ret, "clGetEventProfilingInfo(CL_PROFILING_COMMAND_START)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	case CL_PROFILING_COMMAND_END:
-		if (!FillProperty<cl_ulong>(mockEvent.GetEnd().time_since_epoch().count(), param_value_size, param_value, param_value_size_ret))
+		if (!FillProperty<cl_ulong>(mockEvent.GetEnd().time_since_epoch().count(), param_value_size, param_value, param_value_size_ret, "clGetEventProfilingInfo(CL_PROFILING_COMMAND_END)"))
 			return CL_INVALID_ARG_SIZE;
 		return CL_SUCCESS;
 	default:
