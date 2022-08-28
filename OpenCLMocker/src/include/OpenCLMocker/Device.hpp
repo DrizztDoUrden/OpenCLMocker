@@ -1,7 +1,9 @@
 #pragma once
 
-#include <OpenCLMocker/ForbidCopy.hpp>
+#include <OpenCLMocker/Object.hpp>
+
 #include <OpenCLMocker/MapToCl.hpp>
+#include <OpenCLMocker/TypeValidation.hpp>
 
 #include <CL/cl.h>
 
@@ -11,10 +13,8 @@ namespace OpenCL
 {
     class Platform;
 
-    class Device
+    class Device : public Object, private DeviceValidation
     {
-        ForbidCopy(Device);
-
     public:
         cl_device_type type = CL_DEVICE_TYPE_GPU;
         std::string name = "";
@@ -25,6 +25,8 @@ namespace OpenCL
         Device(Platform* platform, const class DeviceConfig& cfg);
 
         Platform* GetPlatform() const { return _platform; }
+
+        static bool Validate(const Device* device) { return device != nullptr && device->Object::Validate() && device->DeviceValidation::Validate(); }
 
     private:
         Platform* _platform = nullptr;

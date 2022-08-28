@@ -10,6 +10,7 @@ namespace OpenCL
     class DeviceConfig
     {
         ForbidCopy(DeviceConfig);
+        DefaultMove(DeviceConfig);
 
     public:
         std::string name = "Fake Device";
@@ -22,6 +23,7 @@ namespace OpenCL
     class PlatformConfig
     {
         ForbidCopy(PlatformConfig);
+        DefaultMove(PlatformConfig);
 
     public:
         std::vector<DeviceConfig> devices{ 1 };
@@ -37,6 +39,7 @@ namespace OpenCL
     class Config
     {
         ForbidCopy(Config);
+        DefaultMove(Config);
 
     public:
         std::vector<PlatformConfig> platforms{ 1 };

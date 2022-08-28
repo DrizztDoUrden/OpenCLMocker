@@ -13,6 +13,15 @@ using nlohmann::json;
             json.at(#field).get_to(config.field); \
     } while (false)
 
+#define TryParseVector(json, config, field) \
+    do { \
+        if (json.contains(#field)) \
+        { \
+            config.field.clear(); \
+            json.at(#field).get_to(config.field); \
+        } \
+    } while (false)
+
 namespace OpenCL
 {
     static void to_json(json& j, const DeviceConfig& c)
@@ -44,12 +53,7 @@ namespace OpenCL
 
     static void from_json(const json& j, PlatformConfig& c)
     {
-        if (j.contains("devices"))
-        {
-            c.devices.clear();
-            j.at("devices").get_to(c.devices);
-        }
-
+        TryParseVector(j, c, devices);
         TryParse(j, c, name);
         TryParse(j, c, version);
         TryParse(j, c, vendor);
@@ -63,11 +67,7 @@ namespace OpenCL
 
     static void from_json(const json& j, Config& c)
     {
-        if (j.contains("platforms"))
-        {
-            c.platforms.clear();
-            j.at("platforms").get_to(c.platforms);
-        }
+        TryParseVector(j, c, platforms);
     }
 
     Config::Config(const std::string& path)

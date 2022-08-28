@@ -2,6 +2,8 @@
 
 #include <OpenCLMocker/Config.hpp>
 
+#include <iostream>
+
 namespace OpenCL
 {
     Device::Device(Platform* platform, const DeviceConfig& cfg)

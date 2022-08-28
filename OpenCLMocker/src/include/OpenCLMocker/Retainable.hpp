@@ -5,11 +5,11 @@ namespace OpenCL
 	class Retainable
 	{
 	public:
+		Retainable() = default;
+
 		void Retain() { ++references; }
 		bool Release() { return --references == 0; }
-
-	protected:
-		Retainable() = default;
+		int GetReferenceCount() const { return references; }
 
 	private:
 		int references = 1;

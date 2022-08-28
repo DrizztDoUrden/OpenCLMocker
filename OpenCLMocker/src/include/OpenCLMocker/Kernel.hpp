@@ -1,8 +1,10 @@
 #pragma once
 
-#include <OpenCLMocker/ForbidCopy.hpp>
+#include <OpenCLMocker/Object.hpp>
+
 #include <OpenCLMocker/MapToCl.hpp>
 #include <OpenCLMocker/Retainable.hpp>
+#include <OpenCLMocker/TypeValidation.hpp>
 
 #include <CL/cl.h>
 
@@ -10,15 +12,20 @@
 
 namespace OpenCL
 {
-    class Kernel : public Retainable
-    {
-        ForbidCopy(Kernel);
+	class Context;
+	class Program;
 
-    public:
-        std::string name;
+	class Kernel : public Object, public Retainable, private KernelValidation
+	{
+	public:
+		Context* ctx;
+		Program* program;
+		std::string name;
 
 		Kernel() = default;
-    };
+
+		static bool Validate(const Kernel* kernel) { return kernel != nullptr && kernel->Object::Validate() && kernel->KernelValidation::Validate(); }
+	};
 }
 
 MapToCl(OpenCL::Kernel, cl_kernel)

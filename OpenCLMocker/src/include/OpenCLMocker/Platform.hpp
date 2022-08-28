@@ -1,6 +1,7 @@
 #pragma once
 
-#include <OpenCLMocker/ForbidCopy.hpp>
+#include <OpenCLMocker/Object.hpp>
+
 #include <OpenCLMocker/MapToCl.hpp>
 
 #include <CL/cl.h>
@@ -10,22 +11,22 @@
 
 namespace OpenCL
 {
-    class Platform
-    {
-        ForbidCopy(Platform);
+	class Platform : public Object, private PlatformValidation
+	{
+	public:
+		std::vector<class Device> devices;
 
-    public:
-        std::vector<class Device> devices;
+		std::string name;
+		std::string vendor;
+		std::string profile;
+		std::string version;
 
-        std::string name;
-        std::string vendor;
-        std::string profile;
-        std::string version;
+		Platform(const class PlatformConfig& cfg);
 
-        Platform(const class PlatformConfig& cfg);
+		static std::vector<Platform*>& Get();
 
-        static std::vector<Platform*>& Get();
-    };
+		static bool Validate(const Platform* platform) { return platform != nullptr && platform->Object::Validate() && platform->PlatformValidation::Validate(); }
+	};
 }
 
 MapToCl(OpenCL::Platform, cl_platform_id)

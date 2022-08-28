@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #define MapToCl(TFrom, TTo) \
     inline TFrom& MapType(TTo ptr) { return *reinterpret_cast<TFrom*>(ptr); } \
     inline TFrom*& MapType(TTo* ptr) { return *reinterpret_cast<TFrom**>(ptr); } \
