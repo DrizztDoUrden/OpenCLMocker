@@ -8,12 +8,19 @@
 
 #include <CL/cl.h>
 
+#include <map>
 #include <string>
+#include <vector>
 
 namespace OpenCL
 {
 	class Context;
 	class Program;
+
+	struct KernArg
+	{
+		std::vector<char> value;
+	};
 
 	class Kernel : public Object, public Retainable, private KernelValidation
 	{
@@ -25,6 +32,11 @@ namespace OpenCL
 		Kernel() = default;
 
 		static bool Validate(const Kernel* kernel) { return kernel != nullptr && kernel->Object::Validate() && kernel->KernelValidation::Validate(); }
+
+		void SetArg(cl_uint index, size_t size, const void* value);
+
+	private:
+		std::map<size_t, KernArg> args;
 	};
 }
 

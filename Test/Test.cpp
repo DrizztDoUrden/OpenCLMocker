@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <string>
 
 void Validate(cl_int status)
 {

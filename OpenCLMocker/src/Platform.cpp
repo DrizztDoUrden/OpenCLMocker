@@ -8,7 +8,7 @@ namespace OpenCL
     static std::vector<Platform*> LoadPlatforms()
     {
         auto platforms = std::vector<Platform*>{};
-        const auto cfg = Config{"/etc/mockcl.json"};
+        const auto& cfg = Config::GetInstance();
 
         for (const auto& pCfg : cfg.platforms)
             platforms.push_back(new Platform{ pCfg });

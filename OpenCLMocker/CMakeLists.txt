@@ -6,7 +6,11 @@ set (OpenCLMockerSrc
 	src/Config.cpp
 	src/Device.cpp
 	src/Event.cpp
-	src/Platform.cpp)
+	src/Platform.cpp
+	src/Kernel.cpp
+	src/Queue.cpp
+	src/Environment.cpp
+	src/Buffer.cpp)
 
 add_library(OpenCL SHARED ${OpenCLMockerSrc})
 target_compile_features(OpenCL PRIVATE cxx_std_20)

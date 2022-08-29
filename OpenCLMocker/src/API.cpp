@@ -4,6 +4,7 @@
 #include <OpenCLMocker/Device.hpp>
 #include <OpenCLMocker/Enums.hpp>
 #include <OpenCLMocker/Event.hpp>
+#include <OpenCLMocker/Exception.hpp>
 #include <OpenCLMocker/Kernel.hpp>
 #include <OpenCLMocker/MemFlags.hpp>
 #include <OpenCLMocker/Platform.hpp>
@@ -32,28 +33,6 @@ namespace OpenCL
 #else
 	constexpr bool ExtensiveLogging = false;
 #endif
-
-	class Exception : public std::exception
-	{
-	public:
-		Exception(cl_int status, std::string description = "", std::vector<uint8_t> miscData = {})
-			: status(status)
-			, description(std::move(description))
-			, miscData(std::move(miscData))
-		{
-		}
-
-		cl_int GetStatus() const { return status; }
-		const std::string& GetDescription() const { return description; }
-		const std::vector<uint8_t>& GetMiscData() const { return miscData; }
-
-		const char* what() const noexcept override { return description.c_str(); }
-
-	private:
-		cl_int status;
-		std::string description;
-		std::vector<uint8_t> miscData;
-	};
 }
 
 namespace
@@ -630,47 +609,7 @@ cl_mem CL_API_CALL clCreateBuffer(cl_context context, cl_mem_flags flags, size_t
 {
 	return Try<cl_mem>(errcode_ret, &MapType(context), nullptr, [&]()
 		{
-			auto& ctx = MapType(context);
-
-			if (!Context::Validate(&ctx))
-				throw Exception(CL_INVALID_CONTEXT);
-
-			// MIOpen reilies on missing this check
-			//if (size == 0)
-			//	throw Exception(CL_INVALID_BUFFER_SIZE);
-
-			auto flags_ = MemFlags{flags};
-
-			if (!flags_.Validate())
-				throw Exception(CL_INVALID_VALUE, "Invalid buffer creation flags: " + std::to_string(flags) + ".");
-
-			if (flags_.GetKernelAccessFlags() == 0)
-				flags_ |= CL_MEM_READ_WRITE;
-
-			const auto hasHostFlags = flags_.HasAnyFlags(CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR);
-
-			if (host_ptr == nullptr && hasHostFlags ||
-				host_ptr != nullptr && !hasHostFlags)
-				throw Exception(CL_INVALID_HOST_PTR);
-
-			auto buffer = Buffer{flags_};
-			buffer.ctx = &ctx;
-			buffer.size = size;
-
-			if (host_ptr != nullptr)
-				buffer.hostPtr = reinterpret_cast<char*>(host_ptr);
-
-			if (flags_.HasFlags(CL_MEM_USE_HOST_PTR))
-			{
-				buffer.start = buffer.hostPtr;
-			}
-			else
-			{
-				buffer.gpuMemory = std::make_unique<char[]>(size);
-				buffer.start = buffer.gpuMemory.get();
-			}
-
-			return MapType(new Buffer{std::move(buffer)});
+			return MapType(new Buffer{&MapType(context), MemFlags{flags}, size, host_ptr});
 		});
 }
 
@@ -752,7 +691,7 @@ cl_int CL_API_CALL clEnqueueWriteBuffer(cl_command_queue command_queue, cl_mem b
 	return Try(MapType(command_queue), [&]()
 		{
 			auto& queue = MapType(command_queue);
-			const auto& buffer_ = MapType(buffer);
+			auto& buffer_ = MapType(buffer);
 
 			if (!Queue::Validate(&queue))
 				throw Exception{CL_INVALID_COMMAND_QUEUE};
@@ -773,6 +712,9 @@ cl_int CL_API_CALL clEnqueueWriteBuffer(cl_command_queue command_queue, cl_mem b
 				std::chrono::nanoseconds(1000 + rand() % 1000));
 
 			queue.RegisterEvent(mockEvent.get());
+
+			std::memcpy(buffer_.start + offset, ptr, size);
+			buffer_.Dump("write");
 
 			if (ev != nullptr)
 				MapType(ev) = mockEvent.release();
@@ -822,7 +764,7 @@ cl_int CL_API_CALL clEnqueueCopyBuffer(cl_command_queue command_queue, cl_mem sr
 {
 	auto& queue = MapType(command_queue);
 	const auto& src = MapType(src_buffer);
-	const auto& dst = MapType(dst_buffer);
+	auto& dst = MapType(dst_buffer);
 
 	return Try(queue, [&]()
 		{
@@ -853,6 +795,9 @@ cl_int CL_API_CALL clEnqueueCopyBuffer(cl_command_queue command_queue, cl_mem sr
 				std::chrono::nanoseconds(1000 + rand() % 1000));
 
 			queue.RegisterEvent(mockEvent.get());
+
+			std::memcpy(dst.start + dst_offset, src.start + src_offset, size);
+			dst.Dump("copy-from-" + std::to_string(reinterpret_cast<std::ptrdiff_t>(&src)));
 
 			if (ev != nullptr)
 				MapType(ev) = mockEvent.release();
@@ -1234,16 +1179,20 @@ cl_int CL_API_CALL clGetKernelInfo(cl_kernel kernel, cl_kernel_info param_name, 
 		});
 }
 
-cl_int CL_API_CALL clSetKernelArg(cl_kernel kernel, cl_uint /* arg_index */, size_t /* arg_size */, const void* /* arg_value */) CL_API_SUFFIX__VERSION_1_0
+cl_int CL_API_CALL clSetKernelArg(cl_kernel kernel, cl_uint arg_index, size_t arg_size, const void* arg_value) CL_API_SUFFIX__VERSION_1_0
 {
 	return Try(MapType(kernel), [&]()
 		{
-			if (!Kernel::Validate(&MapType(kernel)))
+			auto& kernel_ = MapType(kernel);
+
+			if (!Kernel::Validate(&kernel_))
 				throw Exception{CL_INVALID_KERNEL};
+
+			kernel_.SetArg(arg_index, arg_size, arg_value);
 		});
 }
 
-cl_int CL_API_CALL clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_kernel kernel, cl_uint work_dim, const size_t* /* global_work_offset */, const size_t* /* global_work_size */, const size_t* /* local_work_size */, cl_uint num_events_in_wait_list, const cl_event* event_wait_list, cl_event* ev) CL_API_SUFFIX__VERSION_1_0
+cl_int CL_API_CALL clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_kernel kernel, cl_uint work_dim, const size_t* global_work_offset, const size_t* global_work_size, const size_t* local_work_size, cl_uint num_events_in_wait_list, const cl_event* event_wait_list, cl_event* ev) CL_API_SUFFIX__VERSION_1_0
 {
 	auto& queue = MapType(command_queue);
 	auto& kernel_ = MapType(kernel);
@@ -1260,14 +1209,13 @@ cl_int CL_API_CALL clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
 				num_events_in_wait_list == 0 && event_wait_list != nullptr)
 				throw Exception{CL_INVALID_EVENT_WAIT_LIST};
 
-			auto mockEvent = std::make_unique<Event>(
-				std::vector<cl_event>{event_wait_list, event_wait_list + num_events_in_wait_list},
-				std::chrono::nanoseconds(3000 + rand() % 3000));
-
-			queue.RegisterEvent(mockEvent.get());
-
-			if (ev != nullptr)
-				MapType(ev) = mockEvent.release();
+			queue.EnqueueNDRangeKernel(
+				kernel_,
+				{global_work_offset, global_work_offset + work_dim},
+				{global_work_size, global_work_size + work_dim},
+				{local_work_size, local_work_size + work_dim},
+				{event_wait_list, event_wait_list + num_events_in_wait_list},
+				MapType(ev));
 		});
 }
 
