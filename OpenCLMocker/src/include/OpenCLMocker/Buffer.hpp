@@ -26,7 +26,9 @@ namespace OpenCL
 		char* hostPtr = nullptr;
 		std::size_t size = 0;
 
-		Buffer(Context* context, MemFlags flags, size_t size, void* host_ptr);
+		Buffer(MemFlags flags_);
+		Buffer(Context* context, MemFlags flags_, size_t size, void* host_ptr);
+		Buffer(Buffer&& other) : Object(std::move(other)) {}
 
 		const MemFlags& GetMemFlags() const { return flags; }
 

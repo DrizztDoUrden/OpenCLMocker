@@ -33,4 +33,4 @@ namespace OpenCL
     };
 }
 
-MapToCl(OpenCL::Device, cl_device_id)
+DirectMapToCl(OpenCL::Device, cl_device_id)

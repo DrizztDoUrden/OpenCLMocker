@@ -29,4 +29,4 @@ namespace OpenCL
 	};
 }
 
-MapToCl(OpenCL::Platform, cl_platform_id)
+DirectMapToCl(OpenCL::Platform, cl_platform_id)

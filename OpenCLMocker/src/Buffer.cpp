@@ -12,9 +12,16 @@
 namespace OpenCL
 {
 
-	Buffer::Buffer(Context* context, MemFlags flags, size_t size, void* host_ptr)
+	Buffer::Buffer(MemFlags flags_)
+		: flags(flags_)
+	{
+
+	}
+
+	Buffer::Buffer(Context* context, MemFlags flags_, size_t size_, void* host_ptr)
 		: ctx(context)
-		, flags(std::move(flags))
+		, flags(std::move(flags_))
+		, size(size_)
 	{
 		if (!Context::Validate(ctx))
 			throw Exception(CL_INVALID_CONTEXT);
@@ -34,8 +41,6 @@ namespace OpenCL
 		if (host_ptr == nullptr && hasHostFlags ||
 			host_ptr != nullptr && !hasHostFlags)
 			throw Exception(CL_INVALID_HOST_PTR);
-
-		size = size;
 
 		if (host_ptr != nullptr)
 			hostPtr = reinterpret_cast<char*>(host_ptr);

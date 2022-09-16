@@ -43,7 +43,7 @@ namespace OpenCL
 
 		static bool Validate(const Queue* queue) { return queue != nullptr && queue->Object::Validate() && queue->QueueValidation::Validate(); }
 
-		void EnqueueNDRangeKernel(const Kernel& kernel, const std::vector<size_t>& global_work_offset, const std::vector<size_t>& global_work_size, const std::vector<size_t>& local_work_size, const std::vector<cl_event>& event_wait_list, Event* ev);
+		void EnqueueNDRangeKernel(const Kernel& kernel, const std::vector<size_t>& global_work_offset, const std::vector<size_t>& global_work_size, const std::vector<size_t>& local_work_size, const std::vector<cl_event>& event_wait_list, cl_event* ev);
 
 	private:
 		std::vector<Event*> events;

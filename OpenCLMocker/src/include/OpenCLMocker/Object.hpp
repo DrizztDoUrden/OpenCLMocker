@@ -3,17 +3,19 @@
 #include <OpenCLMocker/ForbidCopy.hpp>
 #include <OpenCLMocker/TypeValidation.hpp>
 
+#include <memory>
+
 namespace OpenCL
 {
 	class Object : private ObjectValidation
 	{
 		ForbidCopy(Object);
-		DefaultMove(Object);
 
 	public:
 		Object() = default;
+		DefaultMove(Object);
 
 	protected:
-		bool Validate() const { return ObjectValidation::Validate(); }
+		inline bool Validate() const { return ObjectValidation::Validate(); }
 	};
 }

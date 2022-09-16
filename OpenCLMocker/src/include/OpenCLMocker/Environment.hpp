@@ -60,13 +60,13 @@ namespace OpenCL
 		ForbidMove(EnvVariableDefinition);
 
 	public:
-		inline EnvVariableDefinition(const char* name, std::optional<TValue>&& default)
+		inline EnvVariableDefinition(const char* name, std::optional<TValue> default_)
 		{
 			const auto envValue = EnvVariable::Get(name);
 
 			if (!envValue.has_value())
 			{
-				value = std::forward(default);
+				value = std::move(default_);
 				return;
 			}
 
@@ -77,7 +77,7 @@ namespace OpenCL
 			else
 			{
 				auto tmp = TValue{};
-				auto ss = std::istringstream{envValue};
+				auto ss = std::istringstream{*envValue};
 
 				if constexpr (IsVector<TValue>)
 				{
@@ -105,7 +105,7 @@ namespace OpenCL
 			return value.has_value();
 		}
 
-		const TValue& operator const TValue&() const
+		inline operator const TValue&() const
 		{
 			return *value;
 		}

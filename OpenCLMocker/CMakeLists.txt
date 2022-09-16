@@ -10,7 +10,7 @@ set (OpenCLMockerSrc
 	src/Kernel.cpp
 	src/Queue.cpp
 	src/Environment.cpp
-	src/Buffer.cpp)
+	src/Buffer.cpp "src/Retainable.cpp")
 
 add_library(OpenCL SHARED ${OpenCLMockerSrc})
 target_compile_features(OpenCL PRIVATE cxx_std_20)

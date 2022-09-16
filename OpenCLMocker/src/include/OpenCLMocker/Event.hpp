@@ -43,6 +43,8 @@ namespace OpenCL
 		{
 		}
 
+		DefaultMove(Event);
+
 		auto GetDuration() const { return end - start; }
 		bool IsFinished() const { return Clock::now() > end; }
 		const TimePoint& GetQueued() const { return queued; }

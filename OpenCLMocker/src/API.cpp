@@ -297,7 +297,7 @@ cl_int CL_API_CALL clGetDeviceIDs(cl_platform_id platform, cl_device_type device
 
 			if (devices != nullptr && num_entries > 0)
 				for (auto i = 0; i < std::min<cl_uint>(num_entries, mockPlatform.devices.size()); i++)
-					devices[i] = MapType(mockPlatform.devices[i]);
+					devices[i] = MapType(&mockPlatform.devices[i]);
 		});
 }
 
@@ -358,7 +358,7 @@ cl_context CL_API_CALL clCreateContext(const cl_context_properties* properties, 
 			if (ctx.platform == nullptr)
 				ctx.platform = ctx.devices.front()->GetPlatform();
 
-			return MapType(new Context{std::move(ctx)});
+			return MakeHandle(new Context{std::move(ctx)});
 		});
 }
 
@@ -385,7 +385,7 @@ cl_context CL_API_CALL clCreateContextFromType(const cl_context_properties* prop
 			for (auto& device : ctx.platform->devices)
 				ctx.devices.push_back(&device);
 
-			return MapType(new Context{std::move(ctx)});
+			return MakeHandle(new Context{std::move(ctx)});
 		});
 }
 
@@ -398,7 +398,7 @@ cl_int CL_API_CALL clRetainContext(cl_context context) CL_API_SUFFIX__VERSION_1_
 			if (!Context::Validate(&ctx))
 				throw Exception{CL_INVALID_CONTEXT};
 
-			ctx.Retain();
+			ctx.Retain(MapHandle(context));
 		});
 }
 
@@ -414,7 +414,7 @@ cl_int CL_API_CALL clGetContextInfo(cl_context context, cl_context_info param_na
 			switch (param_name)
 			{
 			case CL_CONTEXT_REFERENCE_COUNT:
-				if (!FillProperty(static_cast<cl_uint>(ctx.GetReferenceCount()), param_value_size, param_value, param_value_size_ret, "clGetContextInfo(CL_CONTEXT_REFERENCE_COUNT)"))
+				if (!FillProperty(static_cast<cl_uint>(ctx.GetReferenceCount(MapHandle(context))), param_value_size, param_value, param_value_size_ret, "clGetContextInfo(CL_CONTEXT_REFERENCE_COUNT)"))
 					throw Exception{CL_INVALID_VALUE};
 				return;
 			case CL_CONTEXT_PLATFORM:
@@ -541,7 +541,7 @@ cl_command_queue CL_API_CALL clCreateCommandQueue(cl_context context, cl_device_
 			if (errcode_ret != nullptr)
 				*errcode_ret = CL_SUCCESS;
 
-			return MapType(new Queue{std::move(queue)});
+			return MakeHandle(new Queue{std::move(queue)});
 		});
 }
 
@@ -564,7 +564,7 @@ cl_command_queue CL_API_CALL clCreateCommandQueueWithProperties(cl_context conte
 			if (errcode_ret != nullptr)
 				*errcode_ret = CL_SUCCESS;
 
-			return MapType(new Queue{std::move(queue)});
+			return MakeHandle(new Queue{std::move(queue)});
 		});
 }
 
@@ -577,7 +577,7 @@ cl_int CL_API_CALL clRetainCommandQueue(cl_command_queue command_queue) CL_API_S
 			if (!Queue::Validate(&queue))
 				throw Exception{CL_INVALID_COMMAND_QUEUE};
 
-			queue.Retain();
+			queue.Retain(MapHandle(command_queue));
 		});
 }
 
@@ -609,7 +609,7 @@ cl_mem CL_API_CALL clCreateBuffer(cl_context context, cl_mem_flags flags, size_t
 {
 	return Try<cl_mem>(errcode_ret, &MapType(context), nullptr, [&]()
 		{
-			return MapType(new Buffer{&MapType(context), MemFlags{flags}, size, host_ptr});
+			return MakeHandle(new Buffer{&MapType(context), MemFlags{flags}, size, host_ptr});
 		});
 }
 
@@ -669,7 +669,7 @@ cl_mem CL_API_CALL clCreateSubBuffer(cl_mem buffer, cl_mem_flags flags, cl_buffe
 				throw Exception{CL_INVALID_VALUE};
 			}
 
-			return MapType(new Buffer{std::move(subBuffer)});
+			return MakeHandle(new Buffer{std::move(subBuffer)});
 		});
 }
 
@@ -682,7 +682,7 @@ cl_int CL_API_CALL clRetainMemObject(cl_mem memobj) CL_API_SUFFIX__VERSION_1_0
 			if (!Buffer::Validate(&buffer))
 				throw Exception{CL_INVALID_MEM_OBJECT};
 
-			buffer.Retain();
+			buffer.Retain(MapHandle(memobj));
 		});
 }
 
@@ -700,27 +700,34 @@ cl_int CL_API_CALL clEnqueueWriteBuffer(cl_command_queue command_queue, cl_mem b
 			if (queue.ctx != buffer_.ctx)
 				throw Exception{CL_INVALID_CONTEXT};
 			if (buffer_.size < offset + size || ptr == nullptr)
-				throw Exception{CL_INVALID_VALUE};
+				throw Exception{CL_INVALID_VALUE,
+				"Buffer size " + std::to_string(buffer_.size) + " is less than offset " + std::to_string(offset) + " + data size " + std::to_string(size) + "."};
 			if (event_wait_list == nullptr && num_events_in_wait_list > 0 ||
 				event_wait_list != nullptr && num_events_in_wait_list == 0)
 				throw Exception{CL_INVALID_EVENT_WAIT_LIST};
 			if (buffer_.GetMemFlags().HasAnyFlags(CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS))
 				throw Exception{CL_INVALID_OPERATION};
 
-			auto mockEvent = std::make_unique<Event>(
-				std::vector<cl_event>{ event_wait_list, event_wait_list + num_events_in_wait_list },
-				std::chrono::nanoseconds(1000 + rand() % 1000));
+			const Event* weakEvent;
 
-			queue.RegisterEvent(mockEvent.get());
+			{
+				auto mockEvent = std::make_unique<Event>(
+					std::vector<cl_event>{ event_wait_list, event_wait_list + num_events_in_wait_list },
+					std::chrono::nanoseconds(1000 + rand() % 1000));
 
-			std::memcpy(buffer_.start + offset, ptr, size);
-			buffer_.Dump("write");
+				queue.RegisterEvent(mockEvent.get());
 
-			if (ev != nullptr)
-				MapType(ev) = mockEvent.release();
+				std::memcpy(buffer_.start + offset, ptr, size);
+				buffer_.Dump("write");
+
+				weakEvent = mockEvent.get();
+
+				if (ev != nullptr)
+					*ev = MakeHandle(std::move(mockEvent));
+			}
 
 			if (blocking_write)
-				mockEvent->Wait();
+				weakEvent->Wait();
 		});
 }
 
@@ -746,17 +753,23 @@ cl_int CL_API_CALL clEnqueueReadBuffer(cl_command_queue command_queue, cl_mem bu
 			if (buffer_.GetMemFlags().HasAnyFlags(CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS))
 				throw Exception{CL_INVALID_OPERATION};
 
-			auto mockEvent = std::make_unique<Event>(
-				std::vector<cl_event>{ event_wait_list, event_wait_list + num_events_in_wait_list },
-				std::chrono::nanoseconds(1000 + rand() % 1000));
+			const Event* weakEvent;
 
-			queue.RegisterEvent(mockEvent.get());
+			{
+				auto mockEvent = std::make_unique<Event>(
+					std::vector<cl_event>{ event_wait_list, event_wait_list + num_events_in_wait_list },
+					std::chrono::nanoseconds(1000 + rand() % 1000));
 
-			if (ev != nullptr)
-				MapType(ev) = mockEvent.release();
+				queue.RegisterEvent(mockEvent.get());
+
+				weakEvent = mockEvent.get();
+
+				if (ev != nullptr)
+					*ev = MakeHandle(std::move(mockEvent));
+			}
 
 			if (blocking_read)
-				mockEvent->Wait();
+				weakEvent->Wait();
 		});
 }
 
@@ -800,7 +813,7 @@ cl_int CL_API_CALL clEnqueueCopyBuffer(cl_command_queue command_queue, cl_mem sr
 			dst.Dump("copy-from-" + std::to_string(reinterpret_cast<std::ptrdiff_t>(&src)));
 
 			if (ev != nullptr)
-				MapType(ev) = mockEvent.release();
+				*ev = MakeHandle(std::move(mockEvent));
 		});
 }
 
@@ -813,7 +826,7 @@ cl_int CL_API_CALL clGetCommandQueueInfo(cl_command_queue command_queue, cl_comm
 			switch (param_name)
 			{
 			case CL_QUEUE_CONTEXT:
-				if (!FillProperty(MapType(queue.ctx), param_value_size, param_value, param_value_size_ret, "clGetCommandQueueInfo(CL_QUEUE_CONTEXT)"))
+				if (!FillProperty(queue.ctx->handle, param_value_size, param_value, param_value_size_ret, "clGetCommandQueueInfo(CL_QUEUE_CONTEXT)"))
 					throw Exception{CL_INVALID_VALUE};
 				return;
 			case CL_QUEUE_DEVICE:
@@ -851,7 +864,7 @@ cl_program CL_API_CALL clCreateProgramWithSource(cl_context context, cl_uint cou
 				program.sources.emplace_back(strings[i], lengths[i]);
 			}
 
-			return MapType(new Program{std::move(program)});
+			return MakeHandle(new Program{std::move(program)});
 		});
 }
 
@@ -896,7 +909,7 @@ cl_program CL_API_CALL clCreateProgramWithBinary(cl_context context, cl_uint num
 				std::memcpy(program.binaries.rbegin()->data(), binaries[i], lengths[i]);
 			}
 
-			return MapType(new Program{std::move(program)});
+			return MakeHandle(new Program{std::move(program)});
 		});
 }
 
@@ -909,7 +922,7 @@ cl_int CL_API_CALL clRetainProgram(cl_program program) CL_API_SUFFIX__VERSION_1_
 			if (!Program::Validate(&program_))
 				throw Exception(CL_INVALID_PROGRAM);
 
-			program_.Retain();
+			program_.Retain(MapHandle(program));
 		});
 }
 
@@ -1063,11 +1076,11 @@ cl_int CL_API_CALL clGetProgramInfo(cl_program program, cl_program_info param_na
 			switch (param_name)
 			{
 			case CL_PROGRAM_REFERENCE_COUNT:
-				if (!FillProperty(program_.GetReferenceCount(), param_value_size, param_value, param_value_size_ret, "clGetProgramInfo(CL_PROGRAM_REFERENCE_COUNT)"))
+				if (!FillProperty(program_.GetReferenceCount(MapHandle(program)), param_value_size, param_value, param_value_size_ret, "clGetProgramInfo(CL_PROGRAM_REFERENCE_COUNT)"))
 					throw Exception{CL_INVALID_VALUE};
 				return;
 			case CL_PROGRAM_CONTEXT:
-				if (!FillProperty(MapType(program_.ctx), param_value_size, param_value, param_value_size_ret, "clGetProgramInfo(CL_PROGRAM_CONTEXT)"))
+				if (!FillProperty(program_.ctx->handle, param_value_size, param_value, param_value_size_ret, "clGetProgramInfo(CL_PROGRAM_CONTEXT)"))
 					throw Exception{CL_INVALID_VALUE};
 				return;
 			case CL_PROGRAM_NUM_DEVICES:
@@ -1133,7 +1146,7 @@ cl_kernel CL_API_CALL clCreateKernel(cl_program program, const char* kernel_name
 			program_.kernels.push_back(kernel.get());
 			kernel->name = kernel_name;
 
-			return MapType(kernel.release());
+			return MakeHandle(kernel.release());
 		});
 }
 
@@ -1144,7 +1157,7 @@ cl_int CL_API_CALL clRetainKernel(cl_kernel kernel) CL_API_SUFFIX__VERSION_1_0
 			if (!Kernel::Validate(&MapType(kernel)))
 				throw Exception{CL_INVALID_KERNEL};
 
-			MapType(kernel).Retain();
+			MapType(kernel).Retain(MapHandle(kernel));
 		});;
 }
 
@@ -1157,15 +1170,15 @@ cl_int CL_API_CALL clGetKernelInfo(cl_kernel kernel, cl_kernel_info param_name, 
 			switch (param_name)
 			{
 			case CL_KERNEL_REFERENCE_COUNT:
-				if (!FillProperty(k.GetReferenceCount(), param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_REFERENCE_COUNT)"))
+				if (!FillProperty(k.GetReferenceCount(MapHandle(kernel)), param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_REFERENCE_COUNT)"))
 					throw Exception{CL_INVALID_ARG_SIZE};
 				return;
 			case CL_KERNEL_CONTEXT:
-				if (!FillProperty(MapType(k.ctx), param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_CONTEXT)"))
+				if (!FillProperty(k.ctx->handle, param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_CONTEXT)"))
 					throw Exception{CL_INVALID_ARG_SIZE};
 				return;
 			case CL_KERNEL_PROGRAM:
-				if (!FillProperty(MapType(k.program), param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_PROGRAM)"))
+				if (!FillProperty(k.program->handle, param_value_size, param_value, param_value_size_ret, "clGetKernelInfo(CL_KERNEL_PROGRAM)"))
 					throw Exception{CL_INVALID_ARG_SIZE};
 				return;
 			case CL_KERNEL_FUNCTION_NAME:
@@ -1209,13 +1222,14 @@ cl_int CL_API_CALL clEnqueueNDRangeKernel(cl_command_queue command_queue, cl_ker
 				num_events_in_wait_list == 0 && event_wait_list != nullptr)
 				throw Exception{CL_INVALID_EVENT_WAIT_LIST};
 
-			queue.EnqueueNDRangeKernel(
-				kernel_,
-				{global_work_offset, global_work_offset + work_dim},
-				{global_work_size, global_work_size + work_dim},
-				{local_work_size, local_work_size + work_dim},
-				{event_wait_list, event_wait_list + num_events_in_wait_list},
-				MapType(ev));
+			const auto gwo = std::vector<std::size_t>{global_work_offset, global_work_offset + work_dim};
+			const auto gwd = std::vector<std::size_t>{global_work_size, global_work_size + work_dim};
+			const auto lwd = std::vector<std::size_t>{local_work_size, local_work_size + work_dim};
+			const auto events = event_wait_list == nullptr
+				? std::vector<cl_event>{}
+				: std::vector<cl_event>{event_wait_list, event_wait_list + num_events_in_wait_list};
+
+			queue.EnqueueNDRangeKernel(kernel_, gwo, gwd, lwd, events, ev);
 		});
 }
 
@@ -1289,8 +1303,9 @@ cl_int CL_API_CALL clReleaseMemObject(cl_mem memobj) CL_API_SUFFIX__VERSION_1_0
 			if (!Buffer::Validate(&mem))
 				throw Exception{CL_INVALID_MEM_OBJECT};
 
-			if (mem.Release())
-				delete& mem;
+			auto& handle = MapHandle(memobj);
+			if (mem.Release(handle))
+				delete &handle;
 		});
 }
 
@@ -1302,8 +1317,9 @@ cl_int CL_API_CALL clReleaseKernel(cl_kernel kernel) CL_API_SUFFIX__VERSION_1_0
 			if (!Kernel::Validate(&k))
 				throw Exception{CL_INVALID_KERNEL};
 
-			if (k.Release())
-				delete& k;
+			auto& handle = MapHandle(kernel);
+			if (k.Release(handle))
+				delete &handle;
 		});
 }
 
@@ -1315,8 +1331,9 @@ cl_int CL_API_CALL clReleaseProgram(cl_program program) CL_API_SUFFIX__VERSION_1
 			if (!Program::Validate(&p))
 				throw Exception{CL_INVALID_PROGRAM};
 
-			if (p.Release())
-				delete& p;
+			auto& handle = MapHandle(program);
+			if (p.Release(handle))
+				delete& handle;
 		});
 }
 
@@ -1328,8 +1345,9 @@ cl_int CL_API_CALL clReleaseCommandQueue(cl_command_queue command_queue) CL_API_
 			if (!Queue::Validate(&queue))
 				throw Exception{CL_INVALID_COMMAND_QUEUE};
 
-			if (queue.Release())
-				delete& queue;
+			auto& handle = MapHandle(command_queue);
+			if (queue.Release(handle))
+				delete& handle;
 		});
 }
 
@@ -1341,8 +1359,9 @@ cl_int CL_API_CALL clReleaseContext(cl_context context) CL_API_SUFFIX__VERSION_1
 			if (!Context::Validate(&ctx))
 				throw Exception{CL_INVALID_CONTEXT};
 
-			if (ctx.Release())
-				delete& ctx;
+			auto& handle = MapHandle(context);
+			if (ctx.Release(handle))
+				delete& handle;
 		});
 }
 
@@ -1354,7 +1373,8 @@ cl_int CL_API_CALL clReleaseEvent(cl_event ev) CL_API_SUFFIX__VERSION_1_0
 			if (!Event::Validate(&event))
 				throw Exception {CL_INVALID_EVENT};
 
-			if (event.Release())
-				delete& event;
+			auto& handle = MapHandle(ev);
+			if (event.Release(handle))
+				delete& handle;
 		});
 }

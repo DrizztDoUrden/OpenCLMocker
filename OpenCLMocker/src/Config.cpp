@@ -70,7 +70,7 @@ namespace OpenCL
 		TryParse(j, c, profile);
 	}
 
-	static void to_json(json& j, const Config& c)
+	void to_json(json& j, const Config& c)
 	{
 		j = json{
 			{"platforms", c.platforms},
@@ -82,7 +82,7 @@ namespace OpenCL
 			j["dumpBuffersOpFilter"] = c.dumpBuffersOpFilter;
 	}
 
-	static void from_json(const json& j, Config& c)
+	void from_json(const json& j, Config& c)
 	{
 		TryParseVector(j, c, platforms);
 		TryParse(j, c, dumpBuffersRoot);

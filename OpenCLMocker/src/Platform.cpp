@@ -11,7 +11,7 @@ namespace OpenCL
         const auto& cfg = Config::GetInstance();
 
         for (const auto& pCfg : cfg.platforms)
-            platforms.push_back(new Platform{ pCfg });
+            platforms.push_back(new Platform{pCfg});
 
         return platforms;
     }
